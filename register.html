@@ -1,0 +1,8 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Register</title></head><body><header id="nav"></header>
+<main class="narrow"><h1>Create account</h1><form id="f"><label for="n">Name</label><input id="n" required autocomplete="name"><label for="e">Email</label><input id="e" type="email" required autocomplete="email"><label for="m">Mobile number</label><input id="m" inputmode="numeric" maxlength="10" required autocomplete="tel"><label for="p">Password (6+ characters)</label><input id="p" type="password" required autocomplete="new-password"><p><button class="btn">Create account</button></p><a href="login.html">I already have an account</a></form></main>
+<script type="module">
+import{boot,auth,A,F,db,$,toast,authErr}from"./js/app.js";boot();
+$("#f").onsubmit=async ev=>{ev.preventDefault();const name=$("#n").value.trim(),email=$("#e").value.trim(),mobile=$("#m").value.trim(),pw=$("#p").value;
+if(!/^[6-9]\d{9}$/.test(mobile))return toast("Enter a valid 10 digit mobile number.");
+try{const c=await A.createUserWithEmailAndPassword(auth,email,pw);await A.updateProfile(c.user,{displayName:name});await F.setDoc(F.doc(db,"users",c.user.uid),{name,email,mobile});location.href="dashboard.html"}catch(e){toast(authErr(e))}};
+</script></body></html>

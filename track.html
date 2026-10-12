@@ -1,0 +1,9 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Track complaint</title></head><body><header id="nav"></header>
+<main class="narrow"><h1 data-i18n="trk"></h1><form id="f"><label for="id">Complaint ID</label><input id="id" placeholder="CMP-XXXXXXXX" required><p><button class="btn">Track</button></p></form><div id="out" role="status"></div></main>
+<script type="module">
+import{boot,db,F,$,esc,catName,stName,bar,tl}from"./js/app.js";boot();
+let un;const go=id=>{un&&un();un=F.onSnapshot(F.doc(db,"tracking",id),s=>{if(!s.exists()){$("#out").innerHTML="<p>No complaint found with this ID. Check the ID and try again.</p>";return}
+const c=s.data();$("#out").innerHTML=`<div class="card"><b>${esc(c.id)}</b><p>${catName(c.category)}, ${esc(c.place)}</p><span class="tag s${["Submitted","Assigned","In Progress","Resolved"].indexOf(c.status)}">${stName(c.status)}</span>${bar(c.status)}${tl(c.timeline||[])}</div>`},e=>$("#out").textContent=e.message)};
+const q=new URLSearchParams(location.search).get("id");if(q){$("#id").value=q;go(q)}
+$("#f").onsubmit=e=>{e.preventDefault();go($("#id").value.trim().toUpperCase())};
+</script></body></html>

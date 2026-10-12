@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Sachivalayam Complaint Management System</title></head><body>
+<header id="nav"></header>
+<section class="hero">
+<video autoplay muted loop playsinline aria-hidden="true"><source src="assets/hero.mp4" type="video/mp4"></video>
+<div><h1 data-i18n="h1"></h1><p data-i18n="sub"></p><a class="btn" href="complaint.html" data-i18n="reg"></a><a class="btn ghost" href="track.html" data-i18n="trk"></a></div>
+<canvas id="scene" aria-label="3D model of a secretariat building with complaint tickets orbiting it"></canvas>
+</section>
+<main>
+<div class="stats"><button class="stat" data-f="all"><b id="t">0</b><span data-i18n="tot"></span></button><button class="stat" data-f="act"><b id="a">0</b><span data-i18n="act"></span></button><button class="stat" data-f="res"><b id="r">0</b><span data-i18n="res"></span></button></div>
+<div id="list"></div>
+<h2 data-i18n="jr"></h2>
+<div class="path"><div><b>Submitted</b><br><span class="mut">You file it with a place and details.</span></div><div><b>Assigned</b><br><span class="mut">The secretariat picks an owner.</span></div><div><b>In Progress</b><br><span class="mut">Work starts on the ground.</span></div><div><b>Resolved</b><br><span class="mut">Closed, with a note on what was done.</span></div></div>
+<h2 data-i18n="cat"></h2><div class="cats" id="cats"></div>
+</main><footer>© 2026 Sachivalayam Complaint Management System</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{const cv=document.getElementById("scene"),r=new THREE.WebGLRenderer({canvas:cv,alpha:true,antialias:true});r.setPixelRatio(Math.min(devicePixelRatio,2));
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1,.1,100);cam.position.set(0,2.2,11);
+sc.add(new THREE.AmbientLight(0xaecbff,.7));const dl=new THREE.DirectionalLight(0xffffff,1.1);dl.position.set(5,8,6);sc.add(dl);
+const g=new THREE.Group(),add=(geo,c,x,y,z)=>{const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:c,roughness:.35,metalness:.2}));m.position.set(x,y,z);g.add(m)};
+add(new THREE.BoxGeometry(5,.4,3),0x2b4a8f,0,0,0);add(new THREE.BoxGeometry(4.2,.25,2.4),0x3a5fb0,0,.3,0);
+for(let i=0;i<5;i++)add(new THREE.CylinderGeometry(.16,.16,1.8,16),0xeef2f7,-1.8+i*.9,1.3,.9);
+add(new THREE.BoxGeometry(3,1.2,1.8),0xdfe7f5,0,1.4,-.3);add(new THREE.BoxGeometry(4.4,.35,2.6),0xf2a93b,0,2.35,0);
+add(new THREE.SphereGeometry(.9,24,12,0,6.3,0,1.57),0xf2a93b,0,2.5,0);g.position.y=-1.2;sc.add(g);
+const cols=[0xf2a93b,0x5aa9ff,0x9b7bff,0x2fd08a],tk=[];
+for(let i=0;i<12;i++){const c=cols[i%4],m=new THREE.Mesh(new THREE.BoxGeometry(.9,.6,.06),new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.25,transparent:true,opacity:.88}));m.userData={a:i/12*6.283,y:Math.sin(i*1.7)*1.2};sc.add(m);tk.push(m)}
+const pp=new Float32Array(300).map(()=>(Math.random()-.5)*18),P=new THREE.Points(new THREE.BufferGeometry().setAttribute("position",new THREE.BufferAttribute(pp,3)),new THREE.PointsMaterial({size:.04,color:0x9cc4ff}));sc.add(P);
+let mx=0,t=0,vis=true;addEventListener("pointermove",e=>mx=e.clientX/innerWidth-.5);
+const rs=()=>{const w=cv.clientWidth,h=cv.clientHeight;r.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()};addEventListener("resize",rs);rs();
+const calm=matchMedia("(prefers-reduced-motion:reduce)").matches;new IntersectionObserver(e=>vis=e[0].isIntersecting).observe(cv);
+(function loop(){requestAnimationFrame(loop);if(!vis)return;if(!calm)t+=.006;g.rotation.y=t*.6+mx;
+tk.forEach(m=>{const a=m.userData.a+t;m.position.set(Math.cos(a)*4.2,m.userData.y+Math.sin(t*2+a)*.15,Math.sin(a)*4.2);m.lookAt(0,m.position.y,0)});P.rotation.y=t*.1;r.render(sc,cam)})();})();
+document.querySelector("video source").addEventListener("error",e=>e.target.parentNode.remove());
+</script>
+<script type="module">
+import{boot,F,db,$,esc,tr,CATS,catName,bar,byNew}from"./js/app.js";
+await boot();
+$("#cats").innerHTML=Object.entries(CATS).map(([k,v])=>`<a class="card" href="complaint.html?c=${k}">${v[0]} ${catName(k)}</a>`).join("");
+const c=F.collection(db,"tracking"),cnt=async q=>(await F.getCountFromServer(q)).data().count;
+try{const[t,r]=await Promise.all([cnt(c),cnt(F.query(c,F.where("resolved","==",true)))]);$("#t").textContent=t;$("#r").textContent=r;$("#a").textContent=t-r}catch(e){$("#list").textContent="Add your Firebase config in js/firebase-config.js ("+e.code+")"}
+document.querySelectorAll("[data-f]").forEach(b=>b.onclick=async()=>{const f=b.dataset.f,q=f=="all"?F.query(c,F.orderBy("createdAt","desc"),F.limit(30)):F.query(c,F.where("resolved","==",f=="res"),F.limit(30));
+const s=await F.getDocs(q);$("#list").innerHTML=s.docs.map(d=>d.data()).sort(byNew).map(x=>`<a class="card" href="track.html?id=${esc(x.id)}"><b>${esc(x.id)}</b> &nbsp; ${catName(x.category)}, ${esc(x.place)}${bar(x.status)}</a>`).join("")||"<p>No complaints yet.</p>"});
+</script></body></html>

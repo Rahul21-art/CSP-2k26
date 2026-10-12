@@ -1,0 +1,8 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Login</title></head><body><header id="nav"></header>
+<main class="narrow"><h1>Login</h1><form id="f"><label for="e">Email</label><input id="e" type="email" required autocomplete="email"><label for="p">Password</label><input id="p" type="password" required autocomplete="current-password"><p><button class="btn">Login</button></p><a href="#" id="fp">Forgot password?</a> &nbsp; <a href="register.html">Create an account</a></form></main>
+<script type="module">
+import{boot,auth,A,F,db,$,toast,authErr}from"./js/app.js";boot();
+$("#f").onsubmit=async ev=>{ev.preventDefault();try{const c=await A.signInWithEmailAndPassword(auth,$("#e").value.trim(),$("#p").value);const a=(await F.getDoc(F.doc(db,"admins",c.user.uid))).exists();
+const n=new URLSearchParams(location.search).get("next");location.href=n&&/^[\w-]+\.html(\?.*)?$/.test(n)?n:(a?"admin.html":"dashboard.html")}catch(e){toast(authErr(e))}};
+$("#fp").onclick=async e=>{e.preventDefault();const m=$("#e").value.trim();if(!m)return toast("Enter your email first.");try{await A.sendPasswordResetEmail(auth,m);toast("Password reset link sent to your email.")}catch(x){toast(authErr(x))}};
+</script></body></html>

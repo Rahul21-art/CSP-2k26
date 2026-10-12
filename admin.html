@@ -1,0 +1,15 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Admin</title></head><body><header id="nav"></header>
+<main><h1>Admin panel</h1><div class="row"><select id="s"><option value="">All statuses</option><option>Submitted</option><option>Assigned</option><option>In Progress</option><option>Resolved</option></select><input id="q" placeholder="Search by ID, place or name"></div><div id="list"></div></main>
+<script type="module">
+import{guard,db,F,$,esc,catName,STAGES,bar,toast}from"./js/app.js";await guard(true);
+let L=[];const draw=()=>{const s=$("#s").value,q=$("#q").value.trim().toLowerCase();
+$("#list").innerHTML=L.filter(x=>(!s||x.status==s)&&(!q||(x.id+x.place+x.name).toLowerCase().includes(q))).map(x=>`<article class="card" data-id="${esc(x.id)}"><div class="row"><b>${esc(x.id)}</b><span class="tag s${STAGES.indexOf(x.status)}">${esc(x.status)}</span></div><p>${catName(x.category)}, ${esc(x.place)}. ${esc(x.name)}, ${esc(x.email)}</p><p class="mut">${esc(x.description)}</p>${bar(x.status)}<div class="row"><select>${STAGES.map(t=>`<option ${t==x.status?"selected":""}>${t}</option>`).join("")}</select><input placeholder="Note for the citizen (optional)"><button class="btn sm">Update status</button></div></article>`).join("")||"<p>No complaints match.</p>"};
+F.onSnapshot(F.query(F.collection(db,"complaints"),F.orderBy("createdAt","desc"),F.limit(200)),s=>{L=s.docs.map(d=>d.data());draw()},e=>toast(e.message));
+$("#s").onchange=draw;$("#q").oninput=draw;
+$("#list").onclick=async e=>{if(!e.target.matches("button"))return;const a=e.target.closest("article"),x=L.find(c=>c.id==a.dataset.id),st=a.querySelector("select").value,n=a.querySelector("input").value.trim();
+const tl=[...(x.timeline||[]),{s:st,t:Date.now(),...(n&&{n})}],b=F.writeBatch(db);
+b.update(F.doc(db,"complaints",x.id),{status:st,timeline:tl,updatedAt:F.serverTimestamp()});
+b.update(F.doc(db,"tracking",x.id),{status:st,resolved:st=="Resolved",timeline:tl});
+if(st=="Resolved"&&x.dupKey)b.delete(F.doc(db,"openIssues",x.dupKey));
+try{await b.commit();toast("Status updated.")}catch(err){toast(err.message)}};
+</script></body></html>

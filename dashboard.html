@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>My dashboard</title></head><body><header id="nav"></header>
+<main><h1 data-i18n="dash"></h1><div class="card"><b id="who"></b><br><span class="mut" id="mail"></span></div>
+<div class="card" id="note" role="status">No updates yet.</div>
+<div class="stats" style="margin-top:0"><div class="stat"><b id="t">0</b><span data-i18n="tot"></span></div><div class="stat"><b id="a">0</b><span data-i18n="act"></span></div><div class="stat"><b id="r">0</b><span data-i18n="res"></span></div></div>
+<a class="btn" href="complaint.html" data-i18n="reg"></a><div id="list"></div></main>
+<script type="module">
+import{guard,db,F,$,card,stName,byNew}from"./js/app.js";
+const u=await guard();$("#who").textContent=u.displayName||"";$("#mail").textContent=u.email;
+F.onSnapshot(F.query(F.collection(db,"complaints"),F.where("uid","==",u.uid)),s=>{const L=s.docs.map(d=>d.data()).sort(byNew);
+$("#t").textContent=L.length;$("#r").textContent=L.filter(x=>x.status=="Resolved").length;$("#a").textContent=L.filter(x=>x.status!="Resolved").length;
+const n=L.filter(x=>x.status!="Submitted").sort((a,b)=>(b.updatedAt?.seconds||0)-(a.updatedAt?.seconds||0))[0];
+if(n)$("#note").textContent=n.id+": "+stName(n.status);
+$("#list").innerHTML=L.map(card).join("")||'<p>You have not filed a complaint yet.</p>'});
+</script></body></html>

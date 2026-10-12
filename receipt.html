@@ -1,0 +1,8 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Complaint receipt</title></head><body><header id="nav"></header>
+<main class="narrow"><div class="card" id="r">Loading...</div><button class="btn noprint" onclick="print()">Print or save as PDF</button></main>
+<script type="module">
+import{guard,db,F,$,esc,catName,stName,when}from"./js/app.js";await guard();
+try{const s=await F.getDoc(F.doc(db,"complaints",new URLSearchParams(location.search).get("id")||"-"));if(!s.exists())throw 0;const c=s.data();
+$("#r").innerHTML=`<h1>Complaint receipt</h1><p><b style="font-size:1.4rem">${esc(c.id)}</b></p><p><b>Name:</b> ${esc(c.name||c.email)}</p><p><b>Category:</b> ${catName(c.category)}</p><p><b>Place:</b> ${esc(c.place)}</p><p><b>Description:</b> ${esc(c.description)}</p><p><b>Status:</b> ${stName(c.status)}</p><p><b>Filed on:</b> ${c.createdAt?when(c.createdAt.toDate()):"Just now"}</p><p class="mut">Keep this ID to track your complaint.</p>`}
+catch{$("#r").textContent="Receipt not found, or it belongs to another account."}
+</script></body></html>

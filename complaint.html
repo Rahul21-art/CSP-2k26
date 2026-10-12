@@ -1,0 +1,20 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Register complaint</title></head><body><header id="nav"></header>
+<main class="narrow"><h1 data-i18n="reg"></h1><form id="f"><label for="n">Name</label><input id="n" readonly><label for="c">Category</label><select id="c"></select><label for="p">Village, area or street</label><input id="p" required><label for="d">What is the problem?</label><textarea id="d" rows="5" maxlength="1000" required></textarea><p><button class="btn">Submit complaint</button></p></form><div id="out"></div></main>
+<script type="module">
+import{guard,db,F,$,newId,hash,CATS,catName,toast}from"./js/app.js";
+const u=await guard();$("#n").value=u.displayName||u.email;
+const pre=new URLSearchParams(location.search).get("c");
+$("#c").innerHTML=Object.keys(CATS).map(k=>`<option value="${k}" ${k==pre?"selected":""}>${CATS[k][0]} ${catName(k)}</option>`).join("");
+$("#f").onsubmit=async ev=>{ev.preventDefault();const place=$("#p").value.trim(),desc=$("#d").value.trim(),cat=$("#c").value;
+if(place.length<3||desc.length<10)return toast("Add a place and at least 10 characters of detail.");
+const btn=ev.submitter;btn.disabled=true;
+try{const dupKey=cat+"_"+await hash(place),dr=F.doc(db,"openIssues",dupKey),old=await F.getDoc(dr);
+if(old.exists()){$("#out").innerHTML=`<div class="card">This issue is already open as <a href="track.html?id=${old.data().id}">${old.data().id}</a>. Track it instead of filing again.</div>`;return}
+const id=newId(),now=F.serverTimestamp(),tl=[{s:"Submitted",t:Date.now()}],b=F.writeBatch(db);
+b.set(F.doc(db,"complaints",id),{id,uid:u.uid,name:u.displayName||"",email:u.email,category:cat,place,description:desc,status:"Submitted",timeline:tl,dupKey,createdAt:now,updatedAt:now});
+b.set(F.doc(db,"tracking",id),{id,category:cat,place,status:"Submitted",resolved:false,timeline:tl,createdAt:now});
+b.set(dr,{id});await b.commit();
+$("#out").innerHTML=`<div class="card"><h2>Complaint registered</h2><p>Your complaint ID is <b>${id}</b></p><button class="btn" id="cp">Copy ID</button><a class="btn ghost" style="color:#101b3d;border-color:#101b3d" href="receipt.html?id=${id}">Open receipt</a></div>`;
+$("#cp").onclick=()=>navigator.clipboard.writeText(id).then(()=>toast("Complaint ID copied."));$("#f").reset();$("#n").value=u.displayName||u.email
+}catch(e){toast("Could not submit: "+e.message)}finally{btn.disabled=false}};
+</script></body></html>

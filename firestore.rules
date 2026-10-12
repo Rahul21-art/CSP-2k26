@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    match /users/{uid} { allow read, write: if signedIn() && request.auth.uid == uid; }
+    match /admins/{uid} { allow get: if signedIn() && request.auth.uid == uid; }
+
+    match /complaints/{id} {
+      allow get, list: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == "Submitted"
+                    && request.resource.data.description.size() <= 1000;
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","timeline","updatedAt"]);
+    }
+    // Public tracking copy: no name, email or description
+    match /tracking/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.status == "Submitted";
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","resolved","timeline"]);
+    }
+    match /openIssues/{key} {
+      allow get, create: if signedIn();
+      allow delete: if isAdmin();
+    }
+  }
+}
