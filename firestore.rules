@@ -1,28 +1,58 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
-
-    match /users/{uid} { allow read, write: if signedIn() && request.auth.uid == uid; }
-    match /admins/{uid} { allow get: if signedIn() && request.auth.uid == uid; }
-
+    // Check whether the user is authenticated
+    function signedIn() {      return request.auth != null;    }
+    // Check whether the authenticated user is an admin
+    function isAdmin() {
+      return signedIn()        && exists(          /databases/$(database)/documents/admins/$(request.auth.uid)        );
+    }
+    // User profiles
+    match /users/{uid} {
+      allow read, write: if signedIn()                         && request.auth.uid == uid;
+    }
+    // Admin profiles
+    match /admins/{uid} {
+      allow get: if signedIn()                 && request.auth.uid == uid;
+    }
+    // Complaints
     match /complaints/{id} {
-      allow get, list: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
-      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
+      // Users can view their own complaints.Admins can view all complaints.
+      allow get, list: if signedIn()  && (resource.data.uid == request.auth.uid || isAdmin());
+      // Users can register complaints under their own UID.
+      allow create: if signedIn()
+                    && request.resource.data.uid == request.auth.uid
                     && request.resource.data.status == "Submitted"
+                    && request.resource.data.description is string
                     && request.resource.data.description.size() <= 1000;
-      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","timeline","updatedAt"]);
-    }
-    // Public tracking copy: no name, email or description
+      // Only admins can update permitted complaint fields.
+      allow update: if isAdmin()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","timeline","updatedAt"]);    }
+    // Public complaint tracking information
     match /tracking/{id} {
+      // Public tracking access
       allow read: if true;
-      allow create: if signedIn() && request.resource.data.status == "Submitted";
-      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","resolved","timeline"]);
-    }
+      // Authenticated users can create tracking records.
+      allow create: if signedIn()&& request.resource.data.status == "Submitted";
+      // Admins can update tracking status fields.
+      allow update: if isAdmin()&& request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","resolved","timeline"]);    }
+    // Prevent duplicate complaint submissions
     match /openIssues/{key} {
+      // Authenticated users can retrieve or create entries.
       allow get, create: if signedIn();
+      // Only admins can delete entries.
       allow delete: if isAdmin();
+    }
+    // Complaint attachments
+    match /attachments/{id} {
+      // An authenticated user can upload an attachment
+      // belonging to their own account.
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid && request.resource.data.id == id && request.resource.data.data is string&& request.resource.data.data.size() <= 850000;
+      // Users can retrieve their own attachments.
+      // Admins can retrieve any attachment.
+      allow get: if signedIn() && (resource.data.uid == request.auth.uid|| isAdmin());
+      // Only admins can list attachment documents.
+      allow list: if isAdmin();
     }
   }
 }
