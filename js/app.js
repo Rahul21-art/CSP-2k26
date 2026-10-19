@@ -1,8 +1,19 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import *as A from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import *as F from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getDatabase,
+  ref,
+  get
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import { firebaseConfig } from "./firebase-config.js";
 const app = initializeApp(firebaseConfig);
+
+export const auth = A.getAuth(app);
+export const db = F.getFirestore(app);
+export const rtdb = getDatabase(app);
+
+export { A, F };
 export const auth = A.getAuth(app), db = F.getFirestore(app); export { A, F };
 export const $ = s => document.querySelector(s);
 export const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -63,7 +74,17 @@ export const authErr = e => ({ "auth/invalid-credential": "Wrong email or passwo
 export const byNew = (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
 export async function boot() {
     await auth.authStateReady(); const u = auth.currentUser; let adm = false;
-    if (u) try { adm = (await F.getDoc(F.doc(db, "admins", u.uid))).exists() } catch { }
+    if (u) {
+  try {
+    const adminSnap = await get(
+      ref(rtdb, "admins/" + u.uid)
+    );
+
+    adm = adminSnap.val() === true;
+  } catch (e) {
+    console.error("Admin status check failed:", e);
+  }
+}
     $("#nav").innerHTML = `<a class="brand" href="index.html">Sachivalayam<span>CMS</span></a><nav><a href="complaint.html" data-i18n="reg"></a><a href="track.html" data-i18n="trk"></a>${u ? `<a href="${adm ? "admin" : "dashboard"}.html" data-i18n="${adm ? "admin" : "dash"}"></a><a href="#" id="out" data-i18n="out"></a>` : `<a href="login.html" data-i18n="login"></a>`}<button id="lg" aria-label="Language">${lang == "te" ? "English" : "తెలుగు"}</button></nav>`;
     $("#lg").onclick = () => { localStorage.lang = lang == "te" ? "en" : "te"; location.reload() };
     $("#out") && ($("#out").onclick = async e => { e.preventDefault(); await A.signOut(auth); location.href = "index.html" });
