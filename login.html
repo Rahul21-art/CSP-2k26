@@ -1,155 +1,241 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta charset="UTF-8">
 
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
 
-  <link rel="stylesheet" href="css/style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap"
+        rel="stylesheet"
+    >
 
-  <title>Login</title>
+    <link rel="stylesheet" href="css/style.css">
+
+    <title>Login | Sachivalayam CMS</title>
 </head>
 
 <body>
 
-<header id="nav"></header>
+    <header id="nav"></header>
 
-<main class="narrow">
+    <main class="narrow">
 
-  <h1>Login</h1>
+        <h1>Login</h1>
 
-  <form id="f">
+        <form id="f">
 
-    <label for="e">Email</label>
-    <input
-      id="e"
-      type="email"
-      required
-      autocomplete="email"
-    >
+            <label for="e">Email</label>
 
-    <label for="p">Password</label>
-    <input
-      id="p"
-      type="password"
-      required
-      autocomplete="current-password"
-    >
+            <input
+                id="e"
+                type="email"
+                required
+                autocomplete="email"
+            >
 
-    <p>
-      <button class="btn" type="submit">Login</button>
-    </p>
+            <label for="p">Password</label>
 
-    <a href="#" id="fp">Forgot password?</a>
-    &nbsp;
-    <a href="register.html">Create an account</a>
+            <input
+                id="p"
+                type="password"
+                required
+                autocomplete="current-password"
+            >
 
-  </form>
+            <p>
+                <button class="btn" id="loginBtn" type="submit">
+                    Login
+                </button>
+            </p>
 
-</main>
+            <a href="#" id="fp">Forgot password?</a>
 
-<script type="module">
+            &nbsp;
 
-import {
-  boot,
-  auth,
-  A,
-  F,
-  db,
-  $,
-  toast,
-  authErr
-} from "./js/app.js";
+            <a href="register.html">Create an account</a>
 
-import {
-  getDatabase,
-  ref,
-  get
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+        </form>
 
-import {
-  getApp
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    </main>
 
-boot();
+    <script type="module">
 
-// Use the Firebase app initialized by app.js.
-const rtdb = getDatabase(getApp());
+        import {
+            boot,
+            auth,
+            A,
+            R,
+            rtdb,
+            $,
+            toast,
+            authErr
+        } from "./js/app.js";
 
-// LOGIN
-$("#f").onsubmit = async ev => {
+        // Initialize navigation.
+        boot().catch(error => {
+            console.error("Navigation initialization failed:", error);
+        });
 
-  ev.preventDefault();
+        const form = $("#f");
+        const emailInput = $("#e");
+        const passwordInput = $("#p");
+        const loginButton = $("#loginBtn");
 
-  try {
+        // LOGIN
+        form.addEventListener("submit", async event => {
 
-    // Existing Firebase Authentication login.
-    const c = await A.signInWithEmailAndPassword(
-      auth,
-      $("#e").value.trim(),
-      $("#p").value
-    );
+            event.preventDefault();
 
-    // Check whether the logged-in user's UID exists
-    // under admins in Firebase Realtime Database.
-    const adminSnap = await get(
-      ref(rtdb, "admins/" + c.user.uid)
-    );
+            if (loginButton.disabled) {
+                return;
+            }
 
-    // Admin value must be Boolean true.
-    const a = adminSnap.val() === true;
+            loginButton.disabled = true;
+            loginButton.textContent = "Logging in...";
 
-    // Preserve existing next-page redirect functionality.
-    const n = new URLSearchParams(location.search).get("next");
+            try {
 
-    location.href =
-      n && /^[\w-]+\.html(\?.*)?$/.test(n)
-        ? n
-        : (a ? "admin.html" : "dashboard.html");
+                // Step 1: Authenticate user.
+                const credential =
+                    await A.signInWithEmailAndPassword(
+                        auth,
+                        emailInput.value.trim(),
+                        passwordInput.value
+                    );
 
- } catch (e) {
-  console.error("LOGIN ERROR DETAILS:", e);
-  console.error("ERROR CODE:", e.code);
-  console.error("ERROR MESSAGE:", e.message);
+                const user = credential.user;
 
-  toast(
-    (e.code || "unknown-error") +
-    ": " +
-    (e.message || authErr(e))
-  );
-}
+                console.log(
+                    "Authentication successful. UID:",
+                    user.uid
+                );
 
-};
+                // Step 2: Check admin status in Realtime Database.
+                let admin = false;
 
-// FORGOT PASSWORD
-$("#fp").onclick = async e => {
+                try {
 
-  e.preventDefault();
+                    const adminSnapshot = await R.get(
+                        R.ref(rtdb, "admins/" + user.uid)
+                    );
 
-  const m = $("#e").value.trim();
+                    admin = adminSnapshot.val() === true;
 
-  if (!m) {
-    return toast("Enter your email first.");
-  }
+                    console.log("Admin status:", admin);
 
-  try {
+                } catch (databaseError) {
 
-    await A.sendPasswordResetEmail(auth, m);
+                    console.error(
+                        "ADMIN DATABASE CHECK FAILED:",
+                        databaseError
+                    );
 
-    toast("Password reset link sent to your email.");
+                    console.error(
+                        "DATABASE ERROR CODE:",
+                        databaseError.code
+                    );
 
-  } catch (x) {
+                    // Do not grant admin access when verification fails.
+                    toast(
+                        "Login succeeded, but admin verification failed: " +
+                        (databaseError.code || databaseError.message)
+                    );
 
-    toast(authErr(x));
+                    return;
+                }
 
-  }
+                // Step 3: Redirect to the requested page, if valid.
+                const requestedPage =
+                    new URLSearchParams(location.search).get("next");
 
-};
+                // Allow only simple HTML filenames, not external URLs.
+                const safeNext =
+                    requestedPage &&
+                    /^[\w-]+\.html$/.test(requestedPage);
 
-</script>
+                if (safeNext) {
+
+                    // Prevent non-admin users from opening admin.html
+                    // through the next parameter.
+                    if (
+                        requestedPage === "admin.html" &&
+                        !admin
+                    ) {
+                        location.href = "dashboard.html";
+                        return;
+                    }
+
+                    location.href = requestedPage;
+
+                } else {
+
+                    location.href =
+                        admin ? "admin.html" : "dashboard.html";
+
+                }
+
+            } catch (error) {
+
+                console.error("LOGIN ERROR DETAILS:", error);
+
+                console.error("ERROR CODE:", error.code);
+
+                console.error("ERROR MESSAGE:", error.message);
+
+                toast(
+                    (error.code || "unknown-error") +
+                    ": " +
+                    authErr(error)
+                );
+
+            } finally {
+
+                loginButton.disabled = false;
+                loginButton.textContent = "Login";
+
+            }
+
+        });
+
+        // FORGOT PASSWORD
+        $("#fp").addEventListener("click", async event => {
+
+            event.preventDefault();
+
+            const email = emailInput.value.trim();
+
+            if (!email) {
+                toast("Enter your email first.");
+                return;
+            }
+
+            try {
+
+                await A.sendPasswordResetEmail(auth, email);
+
+                toast(
+                    "Password reset link sent to your email."
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "PASSWORD RESET ERROR:",
+                    error
+                );
+
+                toast(authErr(error));
+
+            }
+
+        });
+
+    </script>
 
 </body>
 </html>
-```
