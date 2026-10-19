@@ -1,15 +1,597 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="css/style.css"><title>Admin</title></head><body><header id="nav"></header>
-<main><h1>Admin panel</h1><div class="row"><select id="s"><option value="">All statuses</option><option>Submitted</option><option>Assigned</option><option>In Progress</option><option>Resolved</option></select><input id="q" placeholder="Search by ID, place or name"></div><div id="list"></div></main>
+```html
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width,initial-scale=1"
+    >
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Hind+Guntur:wght@400;600&display=swap"
+        rel="stylesheet"
+    >
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <title>Admin | Sachivalayam CMS</title>
+
+</head>
+
+<body>
+
+<header id="nav"></header>
+
+<main>
+
+    <h1>Admin panel</h1>
+
+    <p>
+        <a class="btn" href="home.html">⌂ Home</a>
+    </p>
+
+    <div class="row">
+
+        <select id="s">
+            <option value="">All statuses</option>
+            <option value="Submitted">Submitted</option>
+            <option value="Assigned">Assigned</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+        </select>
+
+        <input
+            id="q"
+            type="search"
+            placeholder="Search by ID, place or name"
+            autocomplete="off"
+        >
+
+    </div>
+
+    <div id="adminStatus" class="card">
+        Loading complaints...
+    </div>
+
+    <div id="list"></div>
+
+</main>
+
 <script type="module">
-import{guard,db,F,$,esc,catName,STAGES,bar,toast}from"./js/app.js";await guard(true);
-let L=[];const draw=()=>{const s=$("#s").value,q=$("#q").value.trim().toLowerCase();
-$("#list").innerHTML=L.filter(x=>(!s||x.status==s)&&(!q||(x.id+x.place+x.name).toLowerCase().includes(q))).map(x=>`<article class="card" data-id="${esc(x.id)}"><div class="row"><b>${esc(x.id)}</b><span class="tag s${STAGES.indexOf(x.status)}">${esc(x.status)}</span></div><p>${catName(x.category)}, ${esc(x.place)}. ${esc(x.name)}, ${esc(x.email)}</p><p class="mut">${esc(x.description)}</p>${bar(x.status)}<div class="row"><select>${STAGES.map(t=>`<option ${t==x.status?"selected":""}>${t}</option>`).join("")}</select><input placeholder="Note for the citizen (optional)"><button class="btn sm">Update status</button></div></article>`).join("")||"<p>No complaints match.</p>"};
-F.onSnapshot(F.query(F.collection(db,"complaints"),F.orderBy("createdAt","desc"),F.limit(200)),s=>{L=s.docs.map(d=>d.data());draw()},e=>toast(e.message));
-$("#s").onchange=draw;$("#q").oninput=draw;
-$("#list").onclick=async e=>{if(!e.target.matches("button"))return;const a=e.target.closest("article"),x=L.find(c=>c.id==a.dataset.id),st=a.querySelector("select").value,n=a.querySelector("input").value.trim();
-const tl=[...(x.timeline||[]),{s:st,t:Date.now(),...(n&&{n})}],b=F.writeBatch(db);
-b.update(F.doc(db,"complaints",x.id),{status:st,timeline:tl,updatedAt:F.serverTimestamp()});
-b.update(F.doc(db,"tracking",x.id),{status:st,resolved:st=="Resolved",timeline:tl});
-if(st=="Resolved"&&x.dupKey)b.delete(F.doc(db,"openIssues",x.dupKey));
-try{await b.commit();toast("Status updated.")}catch(err){toast(err.message)}};
-</script></body></html>
+
+import {
+    guard,
+    db,
+    F,
+    $,
+    esc,
+    catName,
+    STAGES,
+    bar,
+    toast
+} from "./js/app.js";
+
+
+// ------------------------------------------------------------
+// ADMIN AUTHENTICATION
+// ------------------------------------------------------------
+
+try {
+
+    await guard(true);
+
+} catch (error) {
+
+    console.error(
+        "Admin authentication failed:",
+        error
+    );
+
+    // guard() handles the redirect.
+    throw error;
+
+}
+
+
+// ------------------------------------------------------------
+// STATE
+// ------------------------------------------------------------
+
+let complaints = [];
+
+let updating = false;
+
+
+// ------------------------------------------------------------
+// DOM
+// ------------------------------------------------------------
+
+const list = $("#list");
+const statusFilter = $("#s");
+const searchInput = $("#q");
+const adminStatus = $("#adminStatus");
+
+
+// ------------------------------------------------------------
+// SAFE STRING HELPER
+// ------------------------------------------------------------
+
+const text = value =>
+    String(value ?? "");
+
+
+// ------------------------------------------------------------
+// DRAW COMPLAINTS
+// ------------------------------------------------------------
+
+const draw = () => {
+
+    const selectedStatus =
+        statusFilter.value;
+
+    const search =
+        searchInput.value
+            .trim()
+            .toLowerCase();
+
+
+    const filtered =
+        complaints.filter(complaint => {
+
+            const matchesStatus =
+                !selectedStatus ||
+                complaint.status === selectedStatus;
+
+
+            const searchableText = [
+                complaint.id,
+                complaint.place,
+                complaint.name,
+                complaint.email,
+                complaint.category,
+                complaint.description
+            ]
+                .map(text)
+                .join(" ")
+                .toLowerCase();
+
+
+            const matchesSearch =
+                !search ||
+                searchableText.includes(search);
+
+
+            return matchesStatus && matchesSearch;
+
+        });
+
+
+    if (!filtered.length) {
+
+        list.innerHTML =
+            "<p>No complaints match.</p>";
+
+        return;
+
+    }
+
+
+    list.innerHTML = filtered.map(complaint => {
+
+        const currentStatus =
+            STAGES.includes(complaint.status)
+                ? complaint.status
+                : "Submitted";
+
+
+        const timeline =
+            Array.isArray(complaint.timeline)
+                ? complaint.timeline
+                : [];
+
+
+        return `
+            <article
+                class="card"
+                data-id="${esc(complaint.id)}"
+            >
+
+                <div class="row">
+
+                    <b>
+                        ${esc(complaint.id)}
+                    </b>
+
+                    <span
+                        class="tag s${STAGES.indexOf(currentStatus)}"
+                    >
+                        ${esc(currentStatus)}
+                    </span>
+
+                </div>
+
+
+                <p>
+                    ${esc(catName(complaint.category))},
+                    ${esc(complaint.place)}.
+                    ${esc(complaint.name)},
+                    ${esc(complaint.email)}
+                </p>
+
+
+                <p class="mut">
+                    ${esc(complaint.description)}
+                </p>
+
+
+                ${bar(currentStatus)}
+
+
+                <div class="row">
+
+                    <select
+                        class="status-select"
+                        aria-label="Change complaint status"
+                    >
+
+                        ${STAGES.map(stage => `
+                            <option
+                                value="${esc(stage)}"
+                                ${stage === currentStatus ? "selected" : ""}
+                            >
+                                ${esc(stage)}
+                            </option>
+                        `).join("")}
+
+                    </select>
+
+
+                    <input
+                        class="note-input"
+                        type="text"
+                        placeholder="Note for the citizen (optional)"
+                        maxlength="500"
+                    >
+
+
+                    <button
+                        class="btn sm update-btn"
+                        type="button"
+                    >
+                        Update status
+                    </button>
+
+                </div>
+
+            </article>
+        `;
+
+    }).join("");
+
+};
+
+
+// ------------------------------------------------------------
+// FIRESTORE LISTENER
+// ------------------------------------------------------------
+
+const complaintsQuery =
+    F.query(
+        F.collection(db, "complaints"),
+        F.orderBy("createdAt", "desc"),
+        F.limit(200)
+    );
+
+
+F.onSnapshot(
+
+    complaintsQuery,
+
+    snapshot => {
+
+        complaints =
+            snapshot.docs.map(doc => ({
+                ...doc.data(),
+
+                // Keep the real Firestore document ID.
+                firestoreId: doc.id
+            }));
+
+
+        adminStatus.textContent =
+            `${complaints.length} complaint(s) loaded.`;
+
+
+        draw();
+
+    },
+
+    error => {
+
+        console.error(
+            "Admin complaint listener error:",
+            error
+        );
+
+
+        adminStatus.textContent =
+            "Unable to load complaints.";
+
+
+        list.innerHTML = `
+            <div class="card">
+                <b>Could not load complaints.</b>
+                <p class="mut">
+                    ${esc(error.message)}
+                </p>
+            </div>
+        `;
+
+    }
+
+);
+
+
+// ------------------------------------------------------------
+// FILTERING
+// ------------------------------------------------------------
+
+statusFilter.onchange = draw;
+
+searchInput.oninput = draw;
+
+
+// ------------------------------------------------------------
+// STATUS UPDATE
+// ------------------------------------------------------------
+
+list.onclick = async event => {
+
+    const button =
+        event.target.closest(".update-btn");
+
+
+    if (!button) {
+        return;
+    }
+
+
+    if (updating) {
+        return;
+    }
+
+
+    const article =
+        button.closest("article");
+
+
+    if (!article) {
+        return;
+    }
+
+
+    const complaintId =
+        article.dataset.id;
+
+
+    const complaint =
+        complaints.find(
+            item => item.id === complaintId
+        );
+
+
+    if (!complaint) {
+
+        toast(
+            "Complaint could not be found. Refresh the page."
+        );
+
+        return;
+
+    }
+
+
+    const statusSelect =
+        article.querySelector(".status-select");
+
+
+    const noteInput =
+        article.querySelector(".note-input");
+
+
+    const newStatus =
+        statusSelect.value;
+
+
+    const note =
+        noteInput.value.trim();
+
+
+    const oldStatus =
+        complaint.status || "Submitted";
+
+
+    // Don't perform unnecessary update.
+    if (
+        newStatus === oldStatus &&
+        !note
+    ) {
+
+        toast(
+            "No status or note changes to save."
+        );
+
+        return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // TIMELINE
+    // --------------------------------------------------------
+
+    const existingTimeline =
+        Array.isArray(complaint.timeline)
+            ? complaint.timeline
+            : [];
+
+
+    const timelineEntry = {
+
+        s: newStatus,
+
+        t: Date.now()
+
+    };
+
+
+    if (note) {
+        timelineEntry.n = note;
+    }
+
+
+    const updatedTimeline = [
+        ...existingTimeline,
+        timelineEntry
+    ];
+
+
+    // --------------------------------------------------------
+    // FIRESTORE BATCH
+    // --------------------------------------------------------
+
+    const batch =
+        F.writeBatch(db);
+
+
+    // Use actual Firestore document ID.
+    const complaintRef =
+        F.doc(
+            db,
+            "complaints",
+            complaint.firestoreId || complaint.id
+        );
+
+
+    batch.update(
+        complaintRef,
+        {
+            status: newStatus,
+
+            timeline: updatedTimeline,
+
+            updatedAt: F.serverTimestamp()
+        }
+    );
+
+
+    // --------------------------------------------------------
+    // TRACKING
+    // --------------------------------------------------------
+
+    const trackingRef =
+        F.doc(
+            db,
+            "tracking",
+            complaint.id
+        );
+
+
+    batch.set(
+        trackingRef,
+        {
+            id: complaint.id,
+
+            status: newStatus,
+
+            resolved: newStatus === "Resolved",
+
+            timeline: updatedTimeline,
+
+            updatedAt: F.serverTimestamp()
+        },
+        {
+            merge: true
+        }
+    );
+
+
+    // --------------------------------------------------------
+    // OPEN ISSUES
+    // --------------------------------------------------------
+
+    if (
+        newStatus === "Resolved" &&
+        complaint.dupKey
+    ) {
+
+        const openIssueRef =
+            F.doc(
+                db,
+                "openIssues",
+                complaint.dupKey
+            );
+
+
+        batch.delete(openIssueRef);
+
+    }
+
+
+    // --------------------------------------------------------
+    // SAVE
+    // --------------------------------------------------------
+
+    updating = true;
+
+    button.disabled = true;
+    button.textContent = "Updating...";
+
+
+    try {
+
+        await batch.commit();
+
+        toast(
+            "Status updated successfully."
+        );
+
+
+        // Clear note after successful update.
+        noteInput.value = "";
+
+
+    } catch (error) {
+
+        console.error(
+            "Status update failed:",
+            error
+        );
+
+
+        toast(
+            "Update failed: " +
+            (error.message || "Unknown error")
+        );
+
+
+    } finally {
+
+        updating = false;
+
+        button.disabled = false;
+        button.textContent = "Update status";
+
+    }
+
+};
+
+</script>
+
+</body>
+</html>
+```
