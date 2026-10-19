@@ -109,12 +109,17 @@ $("#f").onsubmit = async ev => {
         ? n
         : (a ? "admin.html" : "dashboard.html");
 
-  } catch (e) {
+ } catch (e) {
+  console.error("LOGIN ERROR DETAILS:", e);
+  console.error("ERROR CODE:", e.code);
+  console.error("ERROR MESSAGE:", e.message);
 
-    // Existing error handling preserved.
-    toast(authErr(e));
-
-  }
+  toast(
+    (e.code || "unknown-error") +
+    ": " +
+    (e.message || authErr(e))
+  );
+}
 
 };
 
