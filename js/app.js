@@ -436,18 +436,9 @@ export async function isAdmin(user) {
         return false;
     }
 
-    try {
-        const snapshot = await R.get(
-            R.ref(rtdb, "admins/" + user.uid)
-        );
-
-        return snapshot.val() === true;
-    } catch (error) {
-        console.error("Admin status check failed:", error);
-        throw error;
-    }
+    const snapshot = await F.getDoc(F.doc(db, "admins", user.uid));
+    return snapshot.exists();
 }
-
 // Initialize navigation and user state.
 export async function boot() {
     await auth.authStateReady();
