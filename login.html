@@ -114,39 +114,19 @@
                     user.uid
                 );
 
-                // Step 2: Check admin status in Realtime Database.
-                let admin = false;
+                // Step 2: Check admin status in Firestore.
+let admin = false;
 
-                try {
-
-                    const adminSnapshot = await R.get(
-                        R.ref(rtdb, "admins/" + user.uid)
-                    );
-
-                    admin = adminSnapshot.val() === true;
-
-                    console.log("Admin status:", admin);
-
-                } catch (databaseError) {
-
-                    console.error(
-                        "ADMIN DATABASE CHECK FAILED:",
-                        databaseError
-                    );
-
-                    console.error(
-                        "DATABASE ERROR CODE:",
-                        databaseError.code
-                    );
-
-                    // Do not grant admin access when verification fails.
-                    toast(
-                        "Login succeeded, but admin verification failed: " +
-                        (databaseError.code || databaseError.message)
-                    );
-
-                    return;
-                }
+try {
+    admin = await isAdmin(user);
+} catch (databaseError) {
+    console.error("Admin check failed:", databaseError);
+    toast(
+        "Login succeeded, but admin check failed: " +
+        (databaseError.code || databaseError.message)
+    );
+    return;
+}
 
                 // Step 3: Redirect to the requested page, if valid.
                 const requestedPage =
