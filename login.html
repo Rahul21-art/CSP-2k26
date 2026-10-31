@@ -66,15 +66,14 @@
     <script type="module">
 
         import {
-            boot,
-            auth,
-            A,
-            R,
-            rtdb,
-            $,
-            toast,
-            authErr
-        } from "./js/app.js";
+    boot,
+    auth,
+    A,
+    isAdmin,
+    $,
+    toast,
+    authErr
+} from "./js/app.js";
 
         // Initialize navigation.
         boot().catch(error => {
